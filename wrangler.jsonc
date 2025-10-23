@@ -1,5 +1,5 @@
 {
-  "name": "google-europe-west3",
+  "name": "unifyphonefirewallconnector",
   "main": "_worker.js",
   "compatibility_date": "2025-10-23"
 }
