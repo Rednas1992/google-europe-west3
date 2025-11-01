@@ -1,28 +1,45 @@
 // _worker.js
 export default {
-  async fetch(req) {
-    // optioneel filter: ?family=ipv4 | ipv6 | beide (default)
-    const family = new URL(req.url).searchParams.get("family");
-
+  async fetch(request) {
+    const url = new URL(request.url);
+    const type = url.searchParams.get('type') || 'all';
+    const scope = url.searchParams.get('scope');
+    const listScopes = url.searchParams.get('list') === 'scopes';
+    
     const r = await fetch("https://www.gstatic.com/ipranges/cloud.json", {
-      // 15 min edge-cache is vaak prima
       cf: { cacheTtl: 900, cacheEverything: true }
     });
-
+    
     if (!r.ok) return new Response("Upstream error", { status: 502 });
-
+    
     const j = await r.json();
+    
+    // Als er gevraagd wordt om een lijst van scopes
+    if (listScopes) {
+      const scopes = new Set();
+      for (const p of j.prefixes || []) {
+        if (p.scope) scopes.add(p.scope);
+      }
+      return new Response([...scopes].sort().join("\n") + "\n", { 
+        headers: { "content-type": "text/plain; charset=utf-8" }
+      });
+    }
+    
     const out = [];
-
+    
     for (const p of j.prefixes || []) {
-      if (p.scope === "europe-west3") {
-        if (!family || family === "ipv4") if (p.ipv4Prefix) out.push(p.ipv4Prefix);
-        if (!family || family === "ipv6") if (p.ipv6Prefix) out.push(p.ipv6Prefix);
+      // Als er geen scope is opgegeven, of als de scope matcht
+      if (!scope || p.scope === scope) {
+        if ((type === 'ipv4' || type === 'all') && p.ipv4Prefix) {
+          out.push(p.ipv4Prefix);
+        }
+        if ((type === 'ipv6' || type === 'all') && p.ipv6Prefix) {
+          out.push(p.ipv6Prefix);
+        }
       }
     }
-
-    // simpele output: één CIDR per regel
-    return new Response(out.join("\n") + "\n", {
+    
+    return new Response(out.join("\n") + "\n", { 
       headers: { "content-type": "text/plain; charset=utf-8" }
     });
   }
